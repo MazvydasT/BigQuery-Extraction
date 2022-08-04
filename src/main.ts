@@ -1,6 +1,8 @@
 import { BigQueryDate, BigQueryTimestamp } from '@google-cloud/bigquery';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { from } from 'ix/iterable';
+import { map as ixMap, orderBy } from 'ix/iterable/operators';
 import jsonexport from 'jsonexport';
 import moment from 'moment';
 import { firstValueFrom, map, mergeMap, retry, timer, toArray } from 'rxjs';
@@ -33,16 +35,20 @@ async function bootstrap() {
 				bigQueryService.read<any>().pipe(
 					map(chunk => {
 						const newChunk = Object.fromEntries(
-							Object.entries(chunk).map(([key, value]) => {
-								let newValue = value;
+							from(Object.entries(chunk)).pipe(
+								ixMap(([key, value]) => {
+									let newValue = value;
 
-								if (newValue instanceof BigQueryDate)
-									newValue = moment(newValue.value).format(`DD/MM/YYYY`);
-								else if (newValue instanceof BigQueryTimestamp)
-									newValue = moment(newValue.value).format(`DD/MM/YYYY HH:mm:ss`);
+									if (newValue instanceof BigQueryDate)
+										newValue = moment(newValue.value).format(`DD/MM/YYYY`);
+									else if (newValue instanceof BigQueryTimestamp)
+										newValue = moment(newValue.value).format(`DD/MM/YYYY HH:mm:ss`);
 
-								return [key, newValue];
-							})
+									return [key, newValue];
+								}),
+
+								orderBy(([key]) => key)
+							)
 						);
 
 						return newChunk;
