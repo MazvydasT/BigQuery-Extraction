@@ -39,10 +39,19 @@ async function bootstrap() {
 								ixMap(([key, value]) => {
 									let newValue = value;
 
-									if (newValue instanceof BigQueryDate)
-										newValue = moment(newValue.value).format(`DD/MM/YYYY`);
-									else if (newValue instanceof BigQueryTimestamp)
-										newValue = moment(newValue.value).format(`DD/MM/YYYY HH:mm:ss`);
+									try {
+										if (newValue instanceof BigQueryDate)
+											newValue = moment(newValue.value).format(`DD/MM/YYYY`);
+										else if (newValue instanceof BigQueryTimestamp)
+											newValue = moment(newValue.value).format(`DD/MM/YYYY HH:mm:ss`);
+									} catch (error) {
+										throw Object.assign(new Error(error.message), {
+											...getAdditionalProperties(error),
+											key,
+											value,
+											...chunk
+										});
+									}
 
 									return [key, newValue];
 								}),
