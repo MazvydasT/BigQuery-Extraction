@@ -13,103 +13,112 @@ export class ConfigurationService {
 
 		config({ path: envPath, override: true });
 
-		return Object.freeze(
-			new Command()
-				.addOption(envOption)
+		const bqtableOption = `--bqtable`;
+		const sqlOption = `--sql`;
 
-				.addOption(
-					new Option(`-o, --output <path>`, `Output file path`)
-						.env(`OUTPUT`)
-						.makeOptionMandatory(true)
+		const command = new Command()
+			.addOption(envOption)
+
+			.addOption(
+				new Option(`-o, --output <path>`, `Output file path`)
+					.env(`OUTPUT`)
+					.makeOptionMandatory(true)
+			)
+
+			.addOption(
+				new Option(`-r, --retry <count>`, `Retry errors`)
+					.env(`RETRY`)
+					.default(5)
+					.argParser(value => {
+						try {
+							return parseIntClamp(value, { min: 0 });
+						} catch (_) {
+							throw new InvalidArgumentError(``);
+						}
+					})
+			)
+			.addOption(
+				new Option(`--retry-delay <ms>`, `Time delay in ms before retrying errors`)
+					.env(`RETRY_DELAY`)
+					.default(10000)
+					.argParser(value => {
+						try {
+							return parseIntClamp(value, { min: 0 });
+						} catch (_) {
+							throw new InvalidArgumentError(``);
+						}
+					})
+			)
+
+			.addOption(
+				new Option(
+					`-c, --persistent-error-cooldown <ms>`,
+					`Time in ms between re-extarction attempts after persistent error`
 				)
+					.env(`PERSISTENT_ERROR_COOLDOWN`)
+					.default(600000)
+					.argParser(parseInt)
+			)
 
-				.addOption(
-					new Option(`-r, --retry <count>`, `Retry errors`)
-						.env(`RETRY`)
-						.default(5)
-						.argParser(value => {
-							try {
-								return parseIntClamp(value, { min: 0 });
-							} catch (_) {
-								throw new InvalidArgumentError(``);
-							}
-						})
-				)
-				.addOption(
-					new Option(`--retry-delay <ms>`, `Time delay in ms before retrying errors`)
-						.env(`RETRY_DELAY`)
-						.default(10000)
-						.argParser(value => {
-							try {
-								return parseIntClamp(value, { min: 0 });
-							} catch (_) {
-								throw new InvalidArgumentError(``);
-							}
-						})
-				)
+			.addOption(
+				new Option(`--cron <expression>`, `Cron expression to schedule extraction`)
+					.env(`CRON`)
+					.argParser(value => {
+						try {
+							return !value ? undefined : parseExpression(value, { iterator: true });
+						} catch (_) {
+							throw new InvalidArgumentError(``);
+						}
+					})
+			)
 
-				.addOption(
-					new Option(
-						`-c, --persistent-error-cooldown <ms>`,
-						`Time in ms between re-extarction attempts after persistent error`
-					)
-						.env(`PERSISTENT_ERROR_COOLDOWN`)
-						.default(600000)
-						.argParser(parseInt)
-				)
+			.addOption(
+				new Option(`--bqkeyfile <filepath>`, 'BigQuery key file')
+					.env(`BQKEYFILE`)
+					.makeOptionMandatory(true)
+			)
+			.addOption(
+				new Option(`--bqproject <name>`, `BigQuery project name`)
+					.env(`BQPROJECT`)
+					.makeOptionMandatory(true)
+			)
+			.addOption(
+				new Option(`--bqdataset <name>`, `BigQuery dataset name`)
+					.env(`BQDATASET`)
+					.makeOptionMandatory(true)
+			)
+			.addOption(new Option(`${bqtableOption} <name>`, `BigQuery table name`).env(`BQTABLE`))
 
-				.addOption(
-					new Option(`--cron <expression>`, `Cron expression to schedule extraction`)
-						.env(`CRON`)
-						.argParser(value => {
-							try {
-								return !value ? undefined : parseExpression(value, { iterator: true });
-							} catch (_) {
-								throw new InvalidArgumentError(``);
-							}
-						})
-				)
+			.addOption(
+				new Option(`${sqlOption} <query>`, `Custom SQL query instead of a table name`).env(`SQL`)
+			)
 
-				.addOption(
-					new Option(`--bqkeyfile <filepath>`, 'BigQuery key file')
-						.env(`BQKEYFILE`)
-						.makeOptionMandatory(true)
-				)
-				.addOption(
-					new Option(`--bqproject <name>`, `BigQuery project name`)
-						.env(`BQPROJECT`)
-						.makeOptionMandatory(true)
-				)
-				.addOption(
-					new Option(`--bqdataset <name>`, `BigQuery dataset name`)
-						.env(`BQDATASET`)
-						.makeOptionMandatory(true)
-				)
-				.addOption(
-					new Option(`--bqtable <name>`, `BigQuery table name`)
-						.env(`BQTABLE`)
-						.makeOptionMandatory(true)
-				)
+			.showHelpAfterError(true)
 
-				.showHelpAfterError(true)
+			.parse();
 
-				.parse()
-				.opts<{
-					output: string;
+		const options = command.opts<{
+			output: string;
 
-					retry: number;
-					retryDelay: number;
+			retry: number;
+			retryDelay: number;
 
-					persistentErrorCooldown: number;
+			persistentErrorCooldown: number;
 
-					cron?: CronExpression<true>;
+			cron?: CronExpression<true>;
 
-					bqkeyfile: string;
-					bqproject: string;
-					bqdataset: string;
-					bqtable: string;
-				}>()
-		);
+			bqkeyfile: string;
+			bqproject: string;
+			bqdataset: string;
+			bqtable?: string;
+
+			sql?: string;
+		}>();
+
+		if (!options.bqtable && !options.sql)
+			command.error(`${bqtableOption} or ${sqlOption} must be set`);
+
+		return Object.freeze(options);
 	})();
 
 	get output() {
@@ -142,5 +151,9 @@ export class ConfigurationService {
 	}
 	get bigQueryTable() {
 		return this.optionValues.bqtable;
+	}
+
+	get sql() {
+		return this.optionValues.sql;
 	}
 }

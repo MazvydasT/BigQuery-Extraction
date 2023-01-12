@@ -7,17 +7,22 @@ import { ConfigurationService } from '../configuration/configuration.service';
 export class BigQueryService {
 	constructor(private configurationService: ConfigurationService) {}
 
-	private bigQueryTable = new BigQuery({
+	private bigQuery = new BigQuery({
 		projectId: this.configurationService.bigQueryProject,
 		keyFilename: this.configurationService.bigQueryKeyFilename
-	})
-		.dataset(this.configurationService.bigQueryDataset)
-		.table(this.configurationService.bigQueryTable);
+	});
+
+	private bigQueryDataset = this.bigQuery.dataset(this.configurationService.bigQueryDataset);
 
 	read<T>(options?: GetRowsOptions) {
 		return new Observable<T>(subscriber => {
-			const readStream = this.bigQueryTable
-				.createReadStream(options)
+			const readStream = !!this.configurationService.bigQueryTable
+				? this.bigQueryDataset
+						.table(this.configurationService.bigQueryTable)
+						.createReadStream(options)
+				: this.bigQueryDataset.createQueryStream(this.configurationService.sql ?? ``);
+
+			readStream
 				.on(`error`, err => subscriber.error(Object.assign(new Error(err.message), err)))
 				.on(`data`, chunk => subscriber.next(chunk))
 				.on(`close`, () => subscriber.complete());
