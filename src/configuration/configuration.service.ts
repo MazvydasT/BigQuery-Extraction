@@ -57,6 +57,12 @@ export class ConfigurationService {
 			)
 
 			.addOption(
+				new Option(`-t, --timestamp-format <format>`, `Timestamp to append to output filename`).env(
+					`TIMESTAMP_FORMAT`
+				)
+			)
+
+			.addOption(
 				new Option(`-r, --retry <count>`, `Retry errors`)
 					.env(`RETRY`)
 					.default(5)
@@ -131,6 +137,8 @@ export class ConfigurationService {
 		const options = command.opts<{
 			output: string;
 
+			timestampFormat?: string;
+
 			retry: number;
 			retryDelay: number;
 
@@ -158,6 +166,10 @@ export class ConfigurationService {
 
 	get outputExtension() {
 		return this.selectedExtension;
+	}
+
+	get timestampFormat() {
+		return this.optionValues.timestampFormat;
 	}
 
 	get retries() {

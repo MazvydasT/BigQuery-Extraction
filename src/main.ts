@@ -102,10 +102,23 @@ async function bootstrap() {
 						break;
 				}
 
+				let outputFilename = configurationService.output;
+				const outputExtensionAsString = AllowedExtensions[outputExtension];
+
+				if (!!configurationService.timestampFormat) {
+					const outputFilenameWithoutExtension = outputFilename.substring(
+						0,
+						outputFilename.length - (outputExtensionAsString.length + 1)
+					);
+
+					outputFilename =
+						outputFilenameWithoutExtension +
+						moment().format(configurationService.timestampFormat) +
+						`.${outputExtensionAsString}`;
+				}
+
 				await firstValueFrom(
-					outputService
-						.outputToFile(outputData, configurationService.output)
-						.pipe(retry(retryConfig))
+					outputService.outputToFile(outputData, outputFilename).pipe(retry(retryConfig))
 				);
 			}
 		} catch (error) {
