@@ -6,9 +6,10 @@ import { map as ixMap, orderBy } from 'ix/iterable/operators';
 import jsonexport from 'jsonexport';
 import moment from 'moment';
 import { firstValueFrom, map, mergeMap, retry, timer, toArray } from 'rxjs';
+import { utils, writeXLSX } from 'xlsx';
 import { AppModule } from './app.module';
 import { BigQueryService } from './big-query/big-query.service';
-import { ConfigurationService } from './configuration/configuration.service';
+import { AllowedExtensions, ConfigurationService } from './configuration/configuration.service';
 import { OutputService } from './output/output.service';
 import { getAdditionalProperties } from './utils';
 
@@ -31,6 +32,8 @@ async function bootstrap() {
 		logger.log(`Starting extraction`);
 
 		try {
+			const outputExtension = configurationService.outputExtension;
+
 			const outputRows = await firstValueFrom(
 				bigQueryService.read<any>().pipe(
 					map(chunk => {
@@ -64,20 +67,40 @@ async function bootstrap() {
 					}),
 
 					mergeMap(async (chunk, index) => {
-						return `${index == 0 ? '\ufeff' : ''}${await jsonexport([chunk], {
-							includeHeaders: index == 0
-						})}\n`;
+						switch (outputExtension) {
+							case AllowedExtensions.csv:
+								return `${index == 0 ? '\ufeff' : ''}${await jsonexport([chunk], {
+									includeHeaders: index == 0
+								})}\n`;
+
+							case AllowedExtensions.xlsx:
+								return chunk;
+						}
 					}),
 
 					retry(retryConfig),
 
 					toArray()
 				),
-				{ defaultValue: new Array<string>() }
+				{ defaultValue: new Array<any>() }
 			);
 
 			if (outputRows.length > 0) {
-				const outputData = outputRows.join(``);
+				let outputData: string | Buffer;
+
+				switch (outputExtension) {
+					case AllowedExtensions.csv:
+						outputData = outputRows.join(``);
+						break;
+
+					case AllowedExtensions.xlsx:
+						const sheet = utils.json_to_sheet(outputRows, { cellDates: true });
+						const workbook = utils.book_new();
+						utils.book_append_sheet(workbook, sheet, `Data`);
+
+						outputData = writeXLSX(workbook, { compression: true, type: `buffer` });
+						break;
+				}
 
 				await firstValueFrom(
 					outputService

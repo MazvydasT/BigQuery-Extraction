@@ -2,10 +2,18 @@ import { Injectable } from '@nestjs/common';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import { CronExpression, parseExpression } from 'cron-parser';
 import { config } from 'dotenv';
+import { extname } from 'path';
 import { parseIntClamp } from '../utils';
+
+export enum AllowedExtensions {
+	csv,
+	xlsx
+}
 
 @Injectable()
 export class ConfigurationService {
+	private selectedExtension: AllowedExtensions;
+
 	private readonly optionValues = (() => {
 		const envOption = new Option(`--env <path>`, `Path to .env file`).env(`ENV`);
 
@@ -16,13 +24,36 @@ export class ConfigurationService {
 		const bqtableOption = `--bqtable`;
 		const sqlOption = `--sql`;
 
+		const allowedExtensions = Object.values(AllowedExtensions).filter(
+			value => typeof value == 'string'
+		);
+		const allowedExtensionAsString = allowedExtensions.join(', ');
+
 		const command = new Command()
 			.addOption(envOption)
 
 			.addOption(
-				new Option(`-o, --output <path>`, `Output file path`)
+				new Option(
+					`-o, --output <path>`,
+					`Output file path. Allowed extensions: ${allowedExtensionAsString}.`
+				)
 					.env(`OUTPUT`)
 					.makeOptionMandatory(true)
+					.argParser(value => {
+						const extension = extname(value);
+						const extensionWithoutADot = extension.substring(1).toLowerCase();
+
+						const allowedExtensionIndex = allowedExtensions.indexOf(extensionWithoutADot);
+
+						if (allowedExtensionIndex > -1) {
+							this.selectedExtension = allowedExtensionIndex;
+							return value;
+						}
+
+						throw new InvalidArgumentError(
+							`Unsupported output extension ${extensionWithoutADot}. Allowed extensions: ${allowedExtensionAsString}.`
+						);
+					})
 			)
 
 			.addOption(
@@ -123,6 +154,10 @@ export class ConfigurationService {
 
 	get output() {
 		return this.optionValues.output;
+	}
+
+	get outputExtension() {
+		return this.selectedExtension;
 	}
 
 	get retries() {
