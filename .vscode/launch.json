@@ -16,7 +16,7 @@
                 "tsconfig-paths/register"
             ],
             "sourceMaps": true,
-            "envFile": "${workspaceFolder}/.env",
+            //"envFile": "${workspaceFolder}/.env",
             "cwd": "${workspaceRoot}",
             "console": "integratedTerminal"
         }
