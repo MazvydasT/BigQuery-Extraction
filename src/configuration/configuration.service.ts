@@ -17,9 +17,19 @@ export class ConfigurationService {
 	private readonly optionValues = (() => {
 		const envOption = new Option(`--env <path>`, `Path to .env file`).env(`ENV`);
 
-		const envPath = new Command().addOption(envOption).parse().opts<{ env?: string }>().env;
+		try {
+			const envPath = new Command()
+				.addOption(envOption)
+				.configureOutput({
+					writeErr: () => null,
+					writeOut: () => null
+				})
+				.exitOverride()
+				.parse()
+				.opts<{ env?: string }>().env;
 
-		config({ path: envPath, override: true });
+			config({ path: envPath, override: true });
+		} catch (_) {}
 
 		const bqtableOption = `--bqtable`;
 		const sqlOption = `--sql`;
