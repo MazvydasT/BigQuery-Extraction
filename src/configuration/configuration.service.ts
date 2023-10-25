@@ -120,6 +120,15 @@ export class ConfigurationService {
 			)
 
 			.addOption(
+				new Option(
+					`--do-not-sort-columns-alphabetically`,
+					`Prevents sorting columns alphabetically`
+				)
+					.env(`DO_NOT_SORT_COLUMNS_ALPHABETICALLY`)
+					.default(false)
+			)
+
+			.addOption(
 				new Option(`--bqkeyfile <filepath>`, 'BigQuery key file')
 					.env(`BQKEYFILE`)
 					.makeOptionMandatory(true)
@@ -155,6 +164,8 @@ export class ConfigurationService {
 			persistentErrorCooldown: number;
 
 			cron?: CronExpression<true>;
+
+			doNotSortColumnsAlphabetically: boolean;
 
 			bqkeyfile: string;
 			bqproject: string;
@@ -195,6 +206,10 @@ export class ConfigurationService {
 
 	get cron() {
 		return this.optionValues.cron;
+	}
+
+	get doNotSortColumnsAlphabetically() {
+		return this.optionValues.doNotSortColumnsAlphabetically;
 	}
 
 	get bigQueryKeyFilename() {

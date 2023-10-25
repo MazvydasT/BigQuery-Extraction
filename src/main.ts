@@ -2,7 +2,7 @@ import { BigQueryDate, BigQueryTimestamp } from '@google-cloud/bigquery';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { from } from 'ix/iterable';
-import { map as ixMap, orderBy } from 'ix/iterable/operators';
+import { map as ixMap } from 'ix/iterable/operators';
 import jsonexport from 'jsonexport';
 import moment from 'moment';
 import { firstValueFrom, map, mergeMap, retry, timer, toArray } from 'rxjs';
@@ -34,9 +34,11 @@ async function bootstrap() {
 		try {
 			const outputExtension = configurationService.outputExtension;
 
+			let orderedFieldNames: string[] | undefined = undefined;
+
 			const outputRows = await firstValueFrom(
 				bigQueryService.read<any>().pipe(
-					map(chunk => {
+					map(({ chunk, schema }) => {
 						const newChunk = Object.fromEntries(
 							from(Object.entries(chunk)).pipe(
 								ixMap(([key, value]) => {
@@ -57,20 +59,29 @@ async function bootstrap() {
 									}
 
 									return [key, newValue];
-								}),
+								}) //,
 
-								orderBy(([key]) => key)
+								//orderBy(([key]) => key)
 							)
 						);
 
-						return newChunk;
+						return { chunk: newChunk, schema };
 					}),
 
-					mergeMap(async (chunk, index) => {
+					mergeMap(async ({ chunk, schema }, index) => {
+						if (index == 0) {
+							orderedFieldNames = schema?.fields?.map(field => field.name ?? ``) ?? [];
+
+							if (!configurationService.doNotSortColumnsAlphabetically) {
+								orderedFieldNames?.sort();
+							}
+						}
+
 						switch (outputExtension) {
 							case AllowedExtensions.csv:
 								return `${index == 0 ? '\ufeff' : ''}${await jsonexport([chunk], {
-									includeHeaders: index == 0
+									includeHeaders: index == 0,
+									headers: orderedFieldNames ?? []
 								})}\n`;
 
 							case AllowedExtensions.xlsx:
@@ -94,7 +105,10 @@ async function bootstrap() {
 						break;
 
 					case AllowedExtensions.xlsx:
-						const sheet = utils.json_to_sheet(outputRows, { cellDates: true });
+						const sheet = utils.json_to_sheet(outputRows, {
+							cellDates: true,
+							header: orderedFieldNames ?? []
+						});
 						const workbook = utils.book_new();
 						utils.book_append_sheet(workbook, sheet, `Data`);
 
