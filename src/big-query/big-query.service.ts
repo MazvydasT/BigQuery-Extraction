@@ -36,7 +36,7 @@ export class BigQueryService {
 
 					readStream = table.createReadStream(options);
 				} else {
-					const [queryJob] = await this.bigQuery.createQueryJob(
+					const [queryJob] = await this.bigQueryDataset.createQueryJob(
 						this.configurationService.sql ?? ``
 					);
 
